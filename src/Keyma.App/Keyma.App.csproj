@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keyma.Core\Keyma.Core.csproj" />
+    <ProjectReference Include="..\Keyma.Network\Keyma.Network.csproj" />
+    <ProjectReference Include="..\Keyma.Platform.Windows\Keyma.Platform.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keyma.App/Keyma.App.csproj" />
+    <Project Path="src/Keyma.Core/Keyma.Core.csproj" />
+    <Project Path="src/Keyma.Network/Keyma.Network.csproj" />
+    <Project Path="src/Keyma.Platform.Windows/Keyma.Platform.Windows.csproj" />
+  </Folder>
+</Solution>
