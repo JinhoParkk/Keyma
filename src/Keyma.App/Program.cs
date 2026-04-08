@@ -67,7 +67,8 @@ static async Task RunServerAsync(CancellationToken ct)
     server.ClientConnected += conn =>
     {
         activeClient = conn;
-        Console.WriteLine($"[Server] Client connected: {conn.RemoteMachineName}");
+        engine.RemoteConnected = true;
+        Console.WriteLine($"[Server] Client connected.");
 
         conn.SwitchFromReceived += () =>
         {
@@ -79,6 +80,7 @@ static async Task RunServerAsync(CancellationToken ct)
         {
             Console.WriteLine("[Server] Client disconnected.");
             activeClient = null;
+            engine.RemoteConnected = false;
             engine.OnRemoteSwitchBack();
         };
 
@@ -106,7 +108,9 @@ static async Task RunServerAsync(CancellationToken ct)
     server.Start();
     engine.Start();
 
-    Console.WriteLine("[Server] Running. Move mouse to right edge to switch to client. Ctrl+C to exit.");
+    Console.WriteLine("[Server] Running. Waiting for client connection...");
+    Console.WriteLine("[Server] Move mouse to right edge (hold ~200ms) to switch to client.");
+    Console.WriteLine("[Server] Press Scroll Lock to force return to local control.");
     await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
 
     engine.Dispose();

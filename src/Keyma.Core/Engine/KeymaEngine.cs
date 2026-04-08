@@ -8,9 +8,18 @@ namespace Keyma.Core.Engine;
 ///
 /// Server role: captures local input, forwards to remote when in RemoteActive state.
 /// Client role: receives remote input events and injects them locally.
+///
+/// Safety: will NOT suppress input unless a remote client is connected.
+/// Emergency: Scroll Lock always forces return to LocalActive.
 /// </summary>
 public sealed class KeymaEngine : IDisposable
 {
+    /// <summary>
+    /// Scroll Lock is the emergency escape key. When pressed, the engine
+    /// unconditionally returns to LocalActive, restoring local input.
+    /// </summary>
+    private const KeyCode EmergencyKey = KeyCode.ScrollLock;
+
     private readonly IInputCapture _capture;
     private readonly IInputInjector _injector;
     private readonly IScreenEdgeDetector _edgeDetector;
@@ -20,8 +29,19 @@ public sealed class KeymaEngine : IDisposable
 
     private EngineState _state = EngineState.LocalActive;
     private volatile bool _disposed;
+    private volatile bool _remoteConnected;
 
     public EngineState State => _state;
+
+    /// <summary>
+    /// Set to true when a remote client is connected and ready.
+    /// The engine will refuse to transition to RemoteActive if this is false.
+    /// </summary>
+    public bool RemoteConnected
+    {
+        get => _remoteConnected;
+        set => _remoteConnected = value;
+    }
 
     public event Action<EngineState>? StateChanged;
 
@@ -49,6 +69,8 @@ public sealed class KeymaEngine : IDisposable
 
     public void Stop()
     {
+        // Always restore local input first
+        TransitionTo(EngineState.LocalActive);
         _capture.Stop();
         _edgeDetector.Stop();
     }
@@ -86,14 +108,35 @@ public sealed class KeymaEngine : IDisposable
 
     private void OnEdgeHit(ScreenEdge edge, int position)
     {
+        // SAFETY: Never transition if no client is connected
+        if (!_remoteConnected)
+            return;
+
         if (_state == EngineState.LocalActive)
             TransitionTo(EngineState.RemoteActive);
     }
 
     private void OnInputReceived(InputEvent evt)
     {
+        // Emergency escape: Scroll Lock always forces LocalActive
+        if (evt.Key == EmergencyKey && evt.Type == InputEventType.KeyDown)
+        {
+            if (_state == EngineState.RemoteActive)
+            {
+                TransitionTo(EngineState.LocalActive);
+                return; // Don't forward the escape key
+            }
+        }
+
         if (_state != EngineState.RemoteActive)
             return;
+
+        // Safety check: if remote disconnected while we were in RemoteActive, bail out
+        if (!_remoteConnected)
+        {
+            TransitionTo(EngineState.LocalActive);
+            return;
+        }
 
         // Fire-and-forget; network layer handles queuing
         _ = _sendToRemote(evt);
@@ -101,6 +144,7 @@ public sealed class KeymaEngine : IDisposable
 
     private void TransitionTo(EngineState newState)
     {
+        if (_state == newState) return;
         _state = newState;
         _capture.SuppressInput = newState == EngineState.RemoteActive;
         StateChanged?.Invoke(newState);
@@ -110,6 +154,8 @@ public sealed class KeymaEngine : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        // Restore input before unhooking
+        _capture.SuppressInput = false;
         _capture.InputReceived -= OnInputReceived;
         _edgeDetector.EdgeHit -= OnEdgeHit;
         Stop();

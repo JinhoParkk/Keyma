@@ -5,13 +5,14 @@ namespace Keyma.Platform.Windows.Screen;
 
 /// <summary>
 /// Polls the cursor position every ~8ms and fires <see cref="EdgeHit"/>
-/// when it reaches a configured screen edge.
-///
-/// Edge detection uses a 1-pixel threshold: the cursor is considered to have
-/// hit an edge when its coordinate equals the screen boundary.
+/// when the cursor stays at a screen edge for at least <see cref="DebounceTicks"/>
+/// consecutive polls (~200ms). This prevents accidental transitions.
 /// </summary>
 public sealed class WindowsScreenEdgeDetector : IScreenEdgeDetector
 {
+    /// <summary>Number of consecutive edge polls before firing (25 × 8ms ≈ 200ms).</summary>
+    private const int DebounceTicks = 25;
+
     private IReadOnlySet<ScreenEdge> _activeEdges = new HashSet<ScreenEdge>();
     private CancellationTokenSource? _cts;
     private Task? _pollTask;
@@ -44,36 +45,49 @@ public sealed class WindowsScreenEdgeDetector : IScreenEdgeDetector
         int maxX = info.Width - 1;
         int maxY = info.Height - 1;
 
-        // Track last state to fire EdgeHit only on transition (not every tick).
-        bool wasAtEdge = false;
+        ScreenEdge? currentEdge = null;
+        int edgeTicks = 0;
+        bool fired = false; // Prevent repeated firing while cursor stays at edge
 
         while (!ct.IsCancellationRequested)
         {
             NativeMethods.GetCursorPos(out var pt);
-            bool atEdge = false;
+            ScreenEdge? detectedEdge = null;
+            int position = 0;
 
             if (_activeEdges.Contains(ScreenEdge.Right) && pt.X >= maxX)
             {
-                atEdge = true;
-                if (!wasAtEdge) EdgeHit?.Invoke(ScreenEdge.Right, pt.Y);
+                detectedEdge = ScreenEdge.Right; position = pt.Y;
             }
             else if (_activeEdges.Contains(ScreenEdge.Left) && pt.X <= 0)
             {
-                atEdge = true;
-                if (!wasAtEdge) EdgeHit?.Invoke(ScreenEdge.Left, pt.Y);
+                detectedEdge = ScreenEdge.Left; position = pt.Y;
             }
             else if (_activeEdges.Contains(ScreenEdge.Bottom) && pt.Y >= maxY)
             {
-                atEdge = true;
-                if (!wasAtEdge) EdgeHit?.Invoke(ScreenEdge.Bottom, pt.X);
+                detectedEdge = ScreenEdge.Bottom; position = pt.X;
             }
             else if (_activeEdges.Contains(ScreenEdge.Top) && pt.Y <= 0)
             {
-                atEdge = true;
-                if (!wasAtEdge) EdgeHit?.Invoke(ScreenEdge.Top, pt.X);
+                detectedEdge = ScreenEdge.Top; position = pt.X;
             }
 
-            wasAtEdge = atEdge;
+            if (detectedEdge == currentEdge && detectedEdge.HasValue)
+            {
+                edgeTicks++;
+                if (edgeTicks >= DebounceTicks && !fired)
+                {
+                    fired = true;
+                    EdgeHit?.Invoke(detectedEdge.Value, position);
+                }
+            }
+            else
+            {
+                // Edge changed or cursor left the edge — reset
+                currentEdge = detectedEdge;
+                edgeTicks = detectedEdge.HasValue ? 1 : 0;
+                fired = false;
+            }
 
             await Task.Delay(8, ct).ConfigureAwait(false);
         }
