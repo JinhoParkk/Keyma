@@ -53,6 +53,16 @@ internal static partial class NativeMethods
     internal const uint KEYEVENTF_SCANCODE   = 0x0008;
     internal const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
 
+    [LibraryImport("user32.dll")]
+    internal static partial short GetAsyncKeyState(int vKey);
+
+    internal const int VK_LSHIFT   = 0xA0;
+    internal const int VK_RSHIFT   = 0xA1;
+    internal const int VK_LCONTROL = 0xA2;
+    internal const int VK_RCONTROL = 0xA3;
+    internal const int VK_LMENU    = 0xA4; // Left Alt
+    internal const int VK_RMENU    = 0xA5; // Right Alt
+
     // ── Delegates ──────────────────────────────────────────────────────────
     internal delegate nint LowLevelHookProc(int nCode, nint wParam, nint lParam);
 

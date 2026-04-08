@@ -115,6 +115,7 @@ public sealed class WindowsInputCapture : IInputCapture
                     {
                         Type = type.Value,
                         Key = VkToKeyCode(info.vkCode),
+                        Modifiers = GetCurrentModifiers(),
                         TimestampMs = info.time,
                     };
                     _eventChannel.Writer.TryWrite(evt);
@@ -178,6 +179,19 @@ public sealed class WindowsInputCapture : IInputCapture
             try { InputReceived?.Invoke(evt); }
             catch { /* never let handler exceptions crash the hook thread */ }
         }
+    }
+
+    // ── Modifier state ───────────────────────────────────────────────────────
+
+    private static bool IsKeyDown(int vk) => (NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    private static ModifierKeys GetCurrentModifiers()
+    {
+        var mods = ModifierKeys.None;
+        if (IsKeyDown(NativeMethods.VK_LSHIFT) || IsKeyDown(NativeMethods.VK_RSHIFT))     mods |= ModifierKeys.Shift;
+        if (IsKeyDown(NativeMethods.VK_LCONTROL) || IsKeyDown(NativeMethods.VK_RCONTROL)) mods |= ModifierKeys.Control;
+        if (IsKeyDown(NativeMethods.VK_LMENU) || IsKeyDown(NativeMethods.VK_RMENU))       mods |= ModifierKeys.Alt;
+        return mods;
     }
 
     // ── Key code mapping ────────────────────────────────────────────────────

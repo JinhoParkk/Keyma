@@ -10,15 +10,16 @@ namespace Keyma.Core.Engine;
 /// Client role: receives remote input events and injects them locally.
 ///
 /// Safety: will NOT suppress input unless a remote client is connected.
-/// Emergency: Scroll Lock always forces return to LocalActive.
+/// Emergency: Ctrl+Shift+Alt+] always forces return to LocalActive.
 /// </summary>
 public sealed class KeymaEngine : IDisposable
 {
     /// <summary>
-    /// Scroll Lock is the emergency escape key. When pressed, the engine
+    /// Emergency escape hotkey: Ctrl+Shift+Alt+]. When pressed, the engine
     /// unconditionally returns to LocalActive, restoring local input.
     /// </summary>
-    private const KeyCode EmergencyKey = KeyCode.ScrollLock;
+    private const KeyCode EmergencyKey = KeyCode.RightBracket;
+    private const ModifierKeys EmergencyModifiers = ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt;
 
     private readonly IInputCapture _capture;
     private readonly IInputInjector _injector;
@@ -118,8 +119,10 @@ public sealed class KeymaEngine : IDisposable
 
     private void OnInputReceived(InputEvent evt)
     {
-        // Emergency escape: Scroll Lock always forces LocalActive
-        if (evt.Key == EmergencyKey && evt.Type == InputEventType.KeyDown)
+        // Emergency escape: Ctrl+Shift+Alt+] always forces LocalActive
+        if (evt.Key == EmergencyKey
+            && evt.Type == InputEventType.KeyDown
+            && (evt.Modifiers & EmergencyModifiers) == EmergencyModifiers)
         {
             if (_state == EngineState.RemoteActive)
             {
